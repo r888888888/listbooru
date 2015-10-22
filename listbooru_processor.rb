@@ -12,7 +12,7 @@ LOGGER = Logger.new(STDOUT)
 def initialize_searches
   LOGGER.info "Initializing searches"
 
-  configatron.processor_iterations.times do
+  while true
     query = REDIS.spop("searches/initial")
     break if query.nil?
 
@@ -39,16 +39,15 @@ def update_searches
   cursor = 0
   min_date = (Date.today - 3).strftime("%Y-%m-%d")
 
-  configatron.processor_iterations.times do
+  while true
     hit = REDIS.scan cursor, match: "searches:*"
 
     if hit[0] == "0"
-      break
+      return
     else
       cursor = hit[0]
       keys = hit[1]
       keys.each do |key|
-        LOGGER.info "  Searching #{key}"
         key =~ /^searches:(.+)/
         query = $1
         resp = HTTParty.get("#{configatron.danbooru_server}/posts.json", login: configatron.danbooru_user, api_key: configatron.danbooru_api_key, tags: "#{query} date:>#{min_date}", limit: 100)
@@ -61,7 +60,6 @@ def update_searches
           end
           REDIS.pipelined do
             REDIS.zadd "searches:#{query}", data
-            REDIS.expire "searches:#{query}", configatrong.cache_expiry
             REDIS.zremrangebyrank "searches:#{query}", 0, -configatron.max_posts_per_search
           end
         end
@@ -73,21 +71,26 @@ end
 def clean_searches
   LOGGER.info "Cleaning searches"
 
-  configatron.processor_iterations.times do
+  while true
     item = REDIS.lpop("searches/clean")
     break if item.nil?
-    
-    item =~ /^(\d+):(.+)/
-    user_id = $1
-    query = $2
 
-    if REDIS.scard("searches:#{query}") == 0
+    if item =~ /^g:(\d+):(.+)/
+      user_id = $1
+      query = $2
+      REDIS.zremrangebyrank "searches/user:#{user_id}", 0, -configatron.max_posts_per_search
+    elsif item =~ /^n:(\d+):(.+?)\x1f(.+)/
+      user_id = $1
+      name = $2
+      query = $3
+      REDIS.zremrangebyrank "searches/user:#{user_id}:#{name}", 0, -configatron.max_posts_per_search
+    end
+
+    if REDIS.zcard("searches:#{query}") == 0
       REDIS.sadd "searches/initial", query
     else
       REDIS.expire("searches:#{query}", configatron.cache_expiry)
     end
-
-    REDIS.zremrangebyrank "searches/user:#{user_id}", 0, -configatron.max_posts_per_search
   end
 end
 
