@@ -10,9 +10,9 @@ REDIS = Redis.new
 helpers do
   def normalize_query(query)
     tokens = query.downcase.scan(/\S+/)
-    tokens.reject! {|x| x =~ /\*/}
-    return "no-matches" if tokens.size == 1 && tokens[0] =~ /^-/
     return "no-matches" if tokens.size == 0
+    return "no-matches" if tokens.any? {|x| x =~ /\*/}
+    return "no-matches" if tokens.all? {|x| x =~ /^-/}
     tokens.join(" ")
   end
 
@@ -36,10 +36,10 @@ before do
 end
 
 get "/users/:user_id/:name" do
-  name = params["name"].downcase
+  name = params["name"]
   user_id = params["user_id"]
-  queries = REDIS.smembers("users:#{user_id}:#{name}")
   start, stop = extract_start_stop(params)
+  queries = REDIS.smembers("users:#{user_id}:#{name}")
 
   if queries.any? && REDIS.zcard("searches/user:#{user_id}:#{name}") == 0
     REDIS.zunionstore "searches/user:#{user_id}:#{name}", queries.map {|x| "searches:#{x}"}
@@ -53,15 +53,14 @@ get "/users/:user_id/:name" do
     end
   end
 
-  results = REDIS.zrevrange("searches/user:#{user_id}", start, stop)
+  results = REDIS.zrevrange("searches/user:#{user_id}:#{name}", start, stop)
   results.to_json
 end
 
 get "/users/:user_id" do
   user_id = params["user_id"]
-  queries = REDIS.smembers("users:#{user_id}")
   start, stop = extract_start_stop(params)
-  results = []
+  queries = REDIS.smembers("users:#{user_id}")
 
   if queries.any? && REDIS.zcard("searches/user:#{user_id}") == 0
     REDIS.zunionstore "searches/user:#{user_id}", queries.map {|x| "searches:#{x}"}
@@ -82,6 +81,12 @@ end
 delete "/searches" do
   user_id = params["user_id"]
   query = normalize_query(params["query"])
+  name = params["name"]
+  
+  if name
+    REDIS.srem("users:#{user_id}:#{name}", query)
+  end
+
   REDIS.srem("users:#{user_id}", query)
   ""
 end
@@ -101,7 +106,7 @@ post "/searches" do
     REDIS.sadd("users:#{user_id}", query)
 
     if name
-      REDIS.sadd("users:#{user_id}:#{name.downcase}", query)
+      REDIS.sadd("users:#{user_id}:#{name}", query)
     end
   end
 
