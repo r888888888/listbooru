@@ -71,20 +71,14 @@ end
 def clean_searches
   LOGGER.info "Cleaning searches"
 
-  while true
+  1_000.times do
     item = REDIS.lpop("searches/clean")
     break if item.nil?
 
-    if item =~ /^g:(\d+):(.+)/
-      user_id = $1
-      query = $2
-      REDIS.zremrangebyrank "searches/user:#{user_id}", 0, -configatron.max_posts_per_search
-    elsif item =~ /^n:(\d+):(.+?)\x1f(.+)/
-      user_id = $1
-      name = $2
-      query = $3
-      REDIS.zremrangebyrank "searches/user:#{user_id}:#{name}", 0, -configatron.max_posts_per_search
-    end
+    item =~ /^(\d+):(.+)/
+    user_id = $1
+    query = $2
+    REDIS.zremrangebyrank "searches/user:#{user_id}", 0, -configatron.max_posts_per_search
 
     if REDIS.zcard("searches:#{query}") == 0
       REDIS.sadd "searches/initial", query
