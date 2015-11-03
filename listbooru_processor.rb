@@ -75,10 +75,23 @@ def clean_searches
     item = REDIS.lpop("searches/clean")
     break if item.nil?
 
-    item =~ /^(\d+):(.+)/
-    user_id = $1
-    query = $2
+    if item =~ /^g:(\d+):(.+)/
+      user_id = $1
+      name = nil
+      query = $2
+    elsif item =~ /^n:(\d+):(.+?)\x1f(.+)/
+      user_id = $1
+      name = $2
+      query = $3
+    else
+      next
+    end
+
     REDIS.zremrangebyrank "searches/user:#{user_id}", 0, -configatron.max_posts_per_search
+
+    if name
+      REDIS.zremrangebyrank "searches/user:#{user_id}:#{name}", 0, -configatron.max_posts_per_search
+    end
 
     if REDIS.zcard("searches:#{query}") == 0
       REDIS.sadd "searches/initial", query

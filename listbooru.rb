@@ -27,6 +27,38 @@ helpers do
     stop = page * per_page
     [start, stop]
   end
+
+  def aggregate_global(user_id, start, stop)
+    queries = REDIS.smembers("users:#{user_id}")
+
+    if queries.any? && REDIS.zcard("searches/user:#{user_id}") == 0
+      REDIS.zunionstore "searches/user:#{user_id}", queries.map {|x| "searches:#{x}"}
+
+      REDIS.pipelined do
+        queries.each do |query|
+          REDIS.rpush("searches/clean", "g:#{user_id}:#{query}")
+        end
+      end
+    end
+
+    REDIS.zrevrange("searches/user:#{user_id}", start, stop)
+  end
+
+  def aggregate_named(user_id, name, start, stop)
+    queries = REDIS.smembers("users:#{user_id}:#{name}")
+
+    if queries.any? && REDIS.zcard("searches/user:#{user_id}:#{name}") == 0
+      REDIS.zunionstore "searches/user:#{user_id}:#{name}", queries.map {|x| "searches:#{x}"}
+
+      REDIS.pipelined do
+        queries.each do |query|
+          REDIS.rpush("searches/clean", "n:#{user_id}:#{name}\x1f#{query}")
+        end
+      end
+    end
+
+    REDIS.zrevrange("searches/user:#{user_id}:#{name}", start, stop)
+  end
 end
 
 before do
@@ -35,46 +67,41 @@ before do
   end
 end
 
-get "/users/:user_id" do
+get "/users" do
   user_id = params["user_id"]
+  name = params["name"]
   start, stop = extract_start_stop(params)
-  queries = REDIS.smembers("users:#{user_id}")
 
-  if queries.any? && REDIS.zcard("searches/user:#{user_id}") == 0
-    REDIS.zunionstore "searches/user:#{user_id}", queries.map {|x| "searches:#{x}"}
-
-    REDIS.pipelined do
-      REDIS.expire("searches/user:#{user_id}", configatron.cache_expiry)
-
-      queries.each do |query|
-        REDIS.rpush("searches/clean", "#{user_id}:#{query}")
-      end
-    end
+  if name
+    results = aggregate_named(user_id, name, start, stop)
+  else
+    results = aggregate_global(user_id, start, stop)
   end
 
-  results = REDIS.zrevrange("searches/user:#{user_id}", start, stop)
   results.to_json
 end
 
 delete "/searches" do
   user_id = params["user_id"]
   query = normalize_query(params["query"])
+  name = params["name"]
 
   REDIS.srem("users:#{user_id}", query)
+  REDIS.srem("users:#{user_id}:#{name}") if name
+
   ""
 end
 
 post "/searches" do
   user_id = params["user_id"]
   query = normalize_query(params["query"])
+  name = params["name"]
 
   if REDIS.scard("users:#{user_id}") > configatron.max_searches_per_user
     halt 409
   else
-    if REDIS.zcard("searches:#{query}") == 0
-      REDIS.sadd("searches/initial", query)
-    end
-
+    REDIS.sadd("searches/initial", query) if REDIS.zcard("searches:#{query}") == 0
+    REDIS.sadd("users:#{user_id}:#{name}") if name
     REDIS.sadd("users:#{user_id}", query)
   end
 
