@@ -100,7 +100,7 @@ post "/searches" do
   if REDIS.scard("users:#{user_id}") > configatron.max_searches_per_user
     halt 409
   else
-    REDIS.sadd("searches/initial", query) if REDIS.zcard("searches:#{query}") == 0
+    # REDIS.sadd("searches/initial", query) if REDIS.zcard("searches:#{query}") == 0
     REDIS.sadd("users:#{user_id}:#{name}") if name
     REDIS.sadd("users:#{user_id}", query)
   end
