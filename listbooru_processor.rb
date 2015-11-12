@@ -17,12 +17,13 @@ def initialize_searches
     break if query.nil?
 
     if REDIS.zcard("searches:#{query}") == 0
-      resp = HTTParty.get("#{configatron.danbooru_server}/posts.json", login: configatron.danbooru_user, api_key: configatron.danbooru_api_key, tags: query, limit: 100)
+      resp = HTTParty.get("#{configatron.danbooru_server}/posts.json", query: {login: configatron.danbooru_user, api_key: configatron.danbooru_api_key, tags: query, limit: 100})
 
       if resp.code == 200
         posts = JSON.parse(resp.body)
         data = []
         posts.each do |post|
+          data << post['id']
           data << post['id']
         end
         REDIS.zadd "searches:#{query}", data
@@ -42,28 +43,29 @@ def update_searches
   while true
     hit = REDIS.scan cursor, match: "searches:*"
 
+    cursor = hit[0]
+    keys = hit[1]
+    keys.each do |key|
+      key =~ /^searches:(.+)/
+      query = $1
+      resp = HTTParty.get("#{configatron.danbooru_server}/posts.json", query: {login: configatron.danbooru_user, api_key: configatron.danbooru_api_key, tags: "#{query} date:>#{min_date}", limit: 100})
+
+      if resp.code == 200
+        posts = JSON.parse(resp.body)
+        data = []
+        posts.each do |post|
+          data << post['id']
+          data << post['id']
+        end
+        if data.any?
+          REDIS.zadd "searches:#{query}", data
+        end
+        REDIS.zremrangebyrank "searches:#{query}", 0, -configatron.max_posts_per_search
+      end
+    end
+
     if hit[0] == "0"
       return
-    else
-      cursor = hit[0]
-      keys = hit[1]
-      keys.each do |key|
-        key =~ /^searches:(.+)/
-        query = $1
-        resp = HTTParty.get("#{configatron.danbooru_server}/posts.json", login: configatron.danbooru_user, api_key: configatron.danbooru_api_key, tags: "#{query} date:>#{min_date}", limit: 100)
-
-        if resp.code == 200
-          posts = JSON.parse(resp.body)
-          data = []
-          posts.each do |post|
-            data << post['id']
-          end
-          REDIS.pipelined do
-            REDIS.zadd "searches:#{query}", data
-            REDIS.zremrangebyrank "searches:#{query}", 0, -configatron.max_posts_per_search
-          end
-        end
-      end
     end
   end
 end
