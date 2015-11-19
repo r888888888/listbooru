@@ -107,3 +107,23 @@ post "/searches" do
 
   ""
 end
+
+put "/searches" do
+  user_id = params["user_id"]
+  new_query = normalize_query(params["new_query"])
+  new_name = params["new_name"]
+  old_query = normalize_query(params["old_query"])
+  old_name = params["old_name"]
+
+  if old_query
+    REDIS.srem("users:#{user_id}", old_query)
+    REDIS.sadd("users:#{user_id}", new_query)
+  end
+
+  if old_name
+    REDIS.srem("users:#{user_id}:#{old_name}", old_query || new_query)
+    REDIS.sadd("users:#{user_id}:#{new_name}", new_query)
+  end
+
+  REDIS.sadd("searches/initial", new_query) if REDIS.zcard("searches:#{new_query}") == 0
+end
