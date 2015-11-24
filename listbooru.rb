@@ -101,7 +101,7 @@ post "/searches" do
     halt 409
   else
     REDIS.sadd("searches/initial", query) if REDIS.zcard("searches:#{query}") == 0
-    REDIS.sadd("users:#{user_id}:#{name}") if name
+    REDIS.sadd("users:#{user_id}:#{name}", query) if name
     REDIS.sadd("users:#{user_id}", query)
   end
 
