@@ -126,4 +126,6 @@ put "/searches" do
   end
 
   REDIS.sadd("searches/initial", new_query) if REDIS.zcard("searches:#{new_query}") == 0
+
+  ""
 end
