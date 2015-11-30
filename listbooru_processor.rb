@@ -17,7 +17,7 @@ def initialize_searches
     break if query.nil?
 
     if REDIS.zcard("searches:#{query}") == 0
-      resp = HTTParty.get("#{configatron.danbooru_server}/posts.json", query: {login: configatron.danbooru_user, api_key: configatron.danbooru_api_key, tags: query, limit: 100})
+      resp = HTTParty.get("#{configatron.danbooru_server}/posts.json", query: {login: configatron.danbooru_user, api_key: configatron.danbooru_api_key, tags: query, limit: configatron.max_posts_per_search})
 
       if resp.code == 200
         posts = JSON.parse(resp.body)
@@ -48,7 +48,7 @@ def update_searches
     keys.each do |key|
       key =~ /^searches:(.+)/
       query = $1
-      resp = HTTParty.get("#{configatron.danbooru_server}/posts.json", query: {login: configatron.danbooru_user, api_key: configatron.danbooru_api_key, tags: "#{query} date:>#{min_date}", limit: 100})
+      resp = HTTParty.get("#{configatron.danbooru_server}/posts.json", query: {login: configatron.danbooru_user, api_key: configatron.danbooru_api_key, tags: "#{query} date:>#{min_date}", limit: configatron.max_posts_per_search})
 
       if resp.code == 200
         posts = JSON.parse(resp.body)
