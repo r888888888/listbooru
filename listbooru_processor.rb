@@ -1,17 +1,13 @@
 require "date"
 require "digest/md5"
 require "redis"
-require "logger"
 require "configatron"
 require "httparty"
 require "./config/config"
 
 REDIS = Redis.new
-LOGGER = Logger.new(STDOUT)
 
 def initialize_searches
-  LOGGER.info "Initializing searches"
-
   while true
     query = REDIS.spop("searches/initial")
     break if query.nil?
@@ -26,17 +22,17 @@ def initialize_searches
           data << post['id']
           data << post['id']
         end
-        REDIS.zadd "searches:#{query}", data
-        REDIS.zremrangebyrank "searches:#{query}", 0, -configatron.max_posts_per_search
-        REDIS.expire "searches:#{query}", configatron.cache_expiry
+        if data.any?
+          REDIS.zadd "searches:#{query}", data
+          REDIS.zremrangebyrank "searches:#{query}", 0, -configatron.max_posts_per_search
+          REDIS.expire "searches:#{query}", configatron.cache_expiry
+        end
       end
     end
   end
 end
 
 def update_searches
-  LOGGER.info "Updating searches"
-
   cursor = 0
   min_date = (Date.today - 3).strftime("%Y-%m-%d")
 
@@ -71,8 +67,6 @@ def update_searches
 end
 
 def clean_searches
-  LOGGER.info "Cleaning searches"
-
   1_000.times do
     item = REDIS.lpop("searches/clean")
     break if item.nil?
