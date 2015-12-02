@@ -16,20 +16,9 @@ helpers do
     tokens.join(" ")
   end
 
-  def extract_start_stop(params)
-    page = (params["page"] || 1).to_i
-    page = 1 if page < 1
-    page = 10 if page > 10
-    per_page = (params["per_page"] || 20).to_i
-    per_page = 1 if per_page < 1
-    per_page = 100 if per_page > 100
-    start = (page - 1) * per_page
-    stop = page * per_page
-    [start, stop]
-  end
-
-  def aggregate_global(user_id, start, stop)
+  def aggregate_global(user_id)
     queries = REDIS.smembers("users:#{user_id}")
+    limit = configatron.max_posts_per_search
 
     if queries.any? && REDIS.zcard("searches/user:#{user_id}") == 0
       REDIS.zunionstore "searches/user:#{user_id}", queries.map {|x| "searches:#{x}"}
@@ -41,11 +30,12 @@ helpers do
       end
     end
 
-    REDIS.zrevrange("searches/user:#{user_id}", start, stop)
+    REDIS.zrevrange("searches/user:#{user_id}", 0, limit)
   end
 
-  def aggregate_named(user_id, name, start, stop)
+  def aggregate_named(user_id, name)
     queries = REDIS.smembers("users:#{user_id}:#{name}")
+    limit = configatron.max_posts_per_search
 
     if queries.any? && REDIS.zcard("searches/user:#{user_id}:#{name}") == 0
       REDIS.zunionstore "searches/user:#{user_id}:#{name}", queries.map {|x| "searches:#{x}"}
@@ -57,7 +47,7 @@ helpers do
       end
     end
 
-    REDIS.zrevrange("searches/user:#{user_id}:#{name}", start, stop)
+    REDIS.zrevrange("searches/user:#{user_id}:#{name}", 0, limit)
   end
 end
 
@@ -70,12 +60,11 @@ end
 get "/users" do
   user_id = params["user_id"]
   name = params["name"]
-  start, stop = extract_start_stop(params)
 
   if name
-    results = aggregate_named(user_id, name, start, stop)
+    results = aggregate_named(user_id, name)
   else
-    results = aggregate_global(user_id, start, stop)
+    results = aggregate_global(user_id)
   end
 
   results.to_json
