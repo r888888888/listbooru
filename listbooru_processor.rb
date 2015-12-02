@@ -99,6 +99,7 @@ def clean_searches
 
     if name
       REDIS.zremrangebyrank "searches/user:#{user_id}:#{name}", 0, -configatron.max_posts_per_search
+      REDIS.expire("searches/user:#{user_id}:name", 60 * 60)
     end
 
     if REDIS.zcard("searches:#{query}") == 0
