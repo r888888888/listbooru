@@ -95,6 +95,7 @@ def clean_searches
     LOGGER.info "  user_id=#{user_id} name=#{name} query=#{query}"
 
     REDIS.zremrangebyrank "searches/user:#{user_id}", 0, -configatron.max_posts_per_search
+    REDIS.expire("searches/user:#{user_id}", 60 * 60)
 
     if name
       REDIS.zremrangebyrank "searches/user:#{user_id}:#{name}", 0, -configatron.max_posts_per_search
