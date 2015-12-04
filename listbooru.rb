@@ -76,7 +76,7 @@ delete "/searches" do
   name = params["name"]
 
   REDIS.srem("users:#{user_id}", query)
-  REDIS.srem("users:#{user_id}:#{name}") if name
+  REDIS.srem("users:#{user_id}:#{name}", query) if name
 
   ""
 end
