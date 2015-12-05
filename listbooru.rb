@@ -72,12 +72,21 @@ end
 
 delete "/searches" do
   user_id = params["user_id"]
-  query = normalize_query(params["query"])
-  name = params["name"]
 
-  REDIS.srem("users:#{user_id}", query)
-  REDIS.srem("users:#{user_id}:#{name}", query) if name
+  if params["all"]
+    REDIS.del("users:#{user_id}")
+    REDIS.scan_each(match: "users:#{user_id}:*") do |key|
+      REDIS.del(key)
+    end
+    REDIS.del("searches/user:#{user_id}")
+  else
+    query = normalize_query(params["query"])
+    name = params["name"]
 
+    REDIS.srem("users:#{user_id}", query)
+    REDIS.srem("users:#{user_id}:#{name}", query) if name
+  end
+  
   ""
 end
 

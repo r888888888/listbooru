@@ -42,33 +42,23 @@ def update_searches
   cursor = 0
   min_date = (Date.today - 3).strftime("%Y-%m-%d")
 
-  while true
-    hit = REDIS.scan cursor, match: "searches:*"
+  REDIS.scan_each(match: "searches:*") do |key|
+    key =~ /^searches:(.+)/
+    query = $1
+    resp = HTTParty.get("#{configatron.danbooru_server}/posts.json", query: {login: configatron.danbooru_user, api_key: configatron.danbooru_api_key, tags: "#{query} date:>#{min_date}", limit: configatron.max_posts_per_search})
 
-    cursor = hit[0]
-    keys = hit[1]
-    keys.each do |key|
-      key =~ /^searches:(.+)/
-      query = $1
-      resp = HTTParty.get("#{configatron.danbooru_server}/posts.json", query: {login: configatron.danbooru_user, api_key: configatron.danbooru_api_key, tags: "#{query} date:>#{min_date}", limit: configatron.max_posts_per_search})
-
-      if resp.code == 200
-        posts = JSON.parse(resp.body)
-        data = []
-        LOGGER.info "  #{query}: #{posts.size}"
-        posts.each do |post|
-          data << post['id']
-          data << post['id']
-        end
-        if data.any?
-          REDIS.zadd "searches:#{query}", data
-        end
-        REDIS.zremrangebyrank "searches:#{query}", 0, -configatron.max_posts_per_search
+    if resp.code == 200
+      posts = JSON.parse(resp.body)
+      data = []
+      LOGGER.info "  #{query}: #{posts.size}"
+      posts.each do |post|
+        data << post['id']
+        data << post['id']
       end
-    end
-
-    if hit[0] == "0"
-      return
+      if data.any?
+        REDIS.zadd "searches:#{query}", data
+      end
+      REDIS.zremrangebyrank "searches:#{query}", 0, -configatron.max_posts_per_search
     end
   end
 end
