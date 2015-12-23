@@ -1,14 +1,22 @@
+#!/usr/bin/env ruby
+
 require "redis"
 require "configatron"
 require "./config/config"
 require "logger"
+require "aws-sdk"
 
 LOGGER = Logger.new(STDOUT)
 REDIS = Redis.new
-SQS = AWS::SQS.new(
-  access_key_id: configatron.amazon_key,
-  secret_access_key: configatron.amazon_secret
+Aws.config.update(
+  region: "us-west-2",
+  credentials: Aws::Credentials.new(
+    configatron.amazon_key,
+    configatron.amazon_secret
+  )
 )
+SQS = Aws::SQS::Client.new
+QUEUE = Aws::SQS::QueuePoller.new(configatron.sqs_url, client: SQS)
 
 def process_queue(sqs)
   sqs.poll do |msg|
@@ -101,4 +109,4 @@ def process_update(tokens)
   REDIS.sadd("searches/initial", new_query) if REDIS.zcard("searches:#{new_query}") == 0
 end
 
-process_queue(SQS)
+process_queue(QUEUE)

@@ -7,6 +7,7 @@ gem "capistrano"
 gem "httparty"
 gem "configatron"
 gem "whenever"
+gem "aws-sdk", "~> 2"
 
 group :production do
   gem 'unicorn', :platforms => :ruby
