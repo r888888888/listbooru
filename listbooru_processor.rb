@@ -10,8 +10,6 @@ REDIS = Redis.new
 LOGGER = Logger.new(STDOUT)
 
 def initialize_searches
-  LOGGER.info "Initializing searches"
-
   while true
     query = REDIS.spop("searches/initial")
     break if query.nil?
@@ -21,7 +19,6 @@ def initialize_searches
 
       if resp.code == 200
         posts = JSON.parse(resp.body)
-        LOGGER.info "  #{query}: #{posts.size}"
         data = []
         posts.each do |post|
           data << post['id']
@@ -38,7 +35,6 @@ def initialize_searches
 end
 
 def update_searches
-  LOGGER.info "Updating searches"
   cursor = 0
   min_date = (Date.today - 3).strftime("%Y-%m-%d")
 
@@ -50,7 +46,6 @@ def update_searches
     if resp.code == 200
       posts = JSON.parse(resp.body)
       data = []
-      LOGGER.info "  #{query}: #{posts.size}"
       posts.each do |post|
         data << post['id']
         data << post['id']
@@ -64,8 +59,6 @@ def update_searches
 end
 
 def clean_searches
-  LOGGER.info "Cleaning searches"
-
   1_000.times do
     item = REDIS.lpop("searches/clean")
     break if item.nil?
@@ -81,8 +74,6 @@ def clean_searches
     else
       next
     end
-
-    LOGGER.info "  user_id=#{user_id} name=#{name} query=#{query}"
 
     REDIS.zremrangebyrank "searches/user:#{user_id}", 0, -configatron.max_posts_per_search
     REDIS.expire("searches/user:#{user_id}", 60 * 60)

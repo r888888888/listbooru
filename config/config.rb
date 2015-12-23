@@ -5,3 +5,5 @@ configatron.danbooru_server = ENV["LISTBOORU_DANBOORU_SERVER"] || "http://danboo
 configatron.auth_key = ENV["LISTBOORU_AUTH_KEY"]
 configatron.danbooru_user = ENV["LISTBOORU_DANBOORU_USER"]
 configatron.danbooru_api_key = ENV["LISTBOORU_DANBOORU_API_KEY"]
+configatron.amazon_key = ENV["AMAZON_KEY"]
+configatron.amazon_secret = ENV["AMAZON_SECRET"]
