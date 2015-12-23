@@ -1,10 +1,13 @@
-#!/usr/bin/env ruby
+#!/home/danbooru/.rbenv/shims/ruby
 
 require "redis"
 require "configatron"
 require "./config/config"
 require "logger"
 require "aws-sdk"
+require 'optparse'
+
+Process.daemon
 
 LOGGER = Logger.new(STDOUT)
 REDIS = Redis.new
@@ -17,9 +20,33 @@ Aws.config.update(
 )
 SQS = Aws::SQS::Client.new
 QUEUE = Aws::SQS::QueuePoller.new(configatron.sqs_url, client: SQS)
+$running = true
+$options = {
+  pidfile: "/var/run/listbooru/ruby-service.pid"
+}
 
-def process_queue(sqs)
-  sqs.poll do |msg|
+OptionParser.new do |opts|
+  opts.on("--pidfile") do |pidfile|
+    $options[:pidfile] = pidfile
+  end
+end
+
+File.open($options[:pidfile], "w") do |f|
+  f.write(Process.pid)
+end
+
+Signal.trap("TERM") do
+  $running = false
+end
+
+def process_queue(poller)
+  poller.before_request do
+    unless $running
+      throw :stop_polling
+    end
+  end
+
+  poller.poll do |msg|
     tokens = msg.body.split(/\n/)
 
     case tokens[0]
