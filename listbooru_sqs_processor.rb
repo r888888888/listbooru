@@ -2,17 +2,33 @@
 
 require "redis"
 require "configatron"
-require "./config/config"
 require "logger"
 require "aws-sdk"
 require 'optparse'
+require "./config/config"
 
 Process.daemon
 
-LOGGER = Logger.new(STDOUT)
+$running = true
+$options = {
+  pidfile: "/var/run/listbooru/ruby-service.pid",
+  logfile: "/var/log/listbooru/listbooru.log"
+}
+
+OptionParser.new do |opts|
+  opts.on("--pidfile") do |pidfile|
+    $options[:pidfile] = pidfile
+  end
+
+  opts.on("--logfile") do |logfile|
+    $options[:logfile] = logfile
+  end
+end
+
+LOGGER = Logger.new(File.open($options[:logfile], File::WRONLY | File::APPEND))
 REDIS = Redis.new
 Aws.config.update(
-  region: "us-west-2",
+  region: configatron.sqs_region,
   credentials: Aws::Credentials.new(
     configatron.amazon_key,
     configatron.amazon_secret
@@ -20,16 +36,6 @@ Aws.config.update(
 )
 SQS = Aws::SQS::Client.new
 QUEUE = Aws::SQS::QueuePoller.new(configatron.sqs_url, client: SQS)
-$running = true
-$options = {
-  pidfile: "/var/run/listbooru/ruby-service.pid"
-}
-
-OptionParser.new do |opts|
-  opts.on("--pidfile") do |pidfile|
-    $options[:pidfile] = pidfile
-  end
-end
 
 File.open($options[:pidfile], "w") do |f|
   f.write(Process.pid)
@@ -46,21 +52,23 @@ def process_queue(poller)
     end
   end
 
-  poller.poll do |msg|
-    tokens = msg.body.split(/\n/)
+  while $running
+    poller.poll do |msg|
+      tokens = msg.body.split(/\n/)
 
-    case tokens[0]
-    when "delete"
-      process_delete(tokens)
+      case tokens[0]
+      when "delete"
+        process_delete(tokens)
 
-    when "create"
-      process_create(tokens)
+      when "create"
+        process_create(tokens)
 
-    when "refresh"
-      process_refresh(tokens)
+      when "refresh"
+        process_refresh(tokens)
 
-    when "update"
-      process_update(tokens)
+      when "update"
+        process_update(tokens)
+      end
     end
   end
 end

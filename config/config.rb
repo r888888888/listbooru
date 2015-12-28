@@ -8,3 +8,4 @@ configatron.danbooru_api_key = ENV["LISTBOORU_DANBOORU_API_KEY"]
 configatron.amazon_key = ENV["AMAZON_KEY"]
 configatron.amazon_secret = ENV["AMAZON_SECRET"]
 configatron.sqs_url = "https://sqs.us-west-2.amazonaws.com/397505046035/testbooru"
+configatron.sqs_region = "us-west-2"
