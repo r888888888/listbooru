@@ -11,8 +11,8 @@ Process.daemon
 
 $running = true
 $options = {
-  pidfile: "/var/run/listbooru/ruby-service.pid",
-  logfile: "/var/log/listbooru/listbooru.log"
+  pidfile: "/var/run/listbooru/sqs_processor.pid",
+  logfile: "/var/log/listbooru/sqs_processor.log"
 }
 
 OptionParser.new do |opts|
