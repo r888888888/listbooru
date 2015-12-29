@@ -23,7 +23,7 @@ OptionParser.new do |opts|
   opts.on("--logfile") do |logfile|
     $options[:logfile] = logfile
   end
-end
+end.parse!
 
 LOGGER = Logger.new(File.open($options[:logfile], "a"))
 REDIS = Redis.new

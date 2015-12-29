@@ -36,7 +36,7 @@ OptionParser.new do |opts|
       $options[:clean] = true
     end
   end
-end
+end.parse!
 
 REDIS = Redis.new
 LOGGER = Logger.new(File.open($options[:logfile], "a"))
