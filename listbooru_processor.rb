@@ -65,6 +65,8 @@ class Processor
             REDIS.expire "searches:#{query}", configatron.cache_expiry
           end
         end
+
+        sleep 1
       end
     end
   end
@@ -92,6 +94,8 @@ class Processor
         end
         REDIS.zremrangebyrank "searches:#{query}", 0, -configatron.max_posts_per_search
       end
+
+      sleep 1
     end
   end
 
