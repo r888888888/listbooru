@@ -53,22 +53,29 @@ def process_queue(poller)
   end
 
   while $running
-    poller.poll do |msg|
-      tokens = msg.body.split(/\n/)
+    begin
+      poller.poll do |msg|
+        tokens = msg.body.split(/\n/)
 
-      case tokens[0]
-      when "delete"
-        process_delete(tokens)
+        case tokens[0]
+        when "delete"
+          process_delete(tokens)
 
-      when "create"
-        process_create(tokens)
+        when "create"
+          process_create(tokens)
 
-      when "refresh"
-        process_refresh(tokens)
+        when "refresh"
+          process_refresh(tokens)
 
-      when "update"
-        process_update(tokens)
+        when "update"
+          process_update(tokens)
+        end
       end
+    rescue Exception => e
+      LOGGER.error(e.message)
+      LOGGER.error(e.backtrace.join("\n"))
+      sleep(60)
+      retry
     end
   end
 end
