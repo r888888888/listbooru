@@ -69,6 +69,13 @@ def process_queue(poller)
 
         when "update"
           process_update(tokens)
+
+        when "clean global"
+          process_global_clean(tokens)
+
+        when "clean named"
+          process_named_clean(tokens)
+
         end
       end
     rescue Exception => e
@@ -149,6 +156,41 @@ def process_update(tokens)
   end
 
   REDIS.sadd("searches/initial", new_query) if REDIS.zcard("searches:#{new_query}") == 0
+end
+
+def process_global_clean(tokens)
+  LOGGER.info "clean global " + tokens.join(" ")
+
+  user_id = tokens[1]
+  query = tokens[2]
+
+  REDIS.zremrangebyrank "searches/user:#{user_id}", 0, -configatron.max_posts_per_search
+  REDIS.expire("searches/user:#{user_id}", 60 * 60)
+
+  if REDIS.zcard("searches:#{query}") == 0
+    REDIS.sadd "searches/initial", query
+  else
+    REDIS.expire("searches:#{query}", configatron.cache_expiry)
+  end
+end
+
+def process_named_clean(tokens)
+  LOGGER.info "clean named " + tokens.join(" ")
+
+  user_id = tokens[1]
+  name = tokens[2]
+  query = tokens[3]
+
+  REDIS.zremrangebyrank "searches/user:#{user_id}", 0, -configatron.max_posts_per_search
+  REDIS.expire("searches/user:#{user_id}", 60 * 60)
+  REDIS.zremrangebyrank "searches/user:#{user_id}:#{name}", 0, -configatron.max_posts_per_search
+  REDIS.expire("searches/user:#{user_id}:name", 60 * 60)
+
+  if REDIS.zcard("searches:#{query}") == 0
+    REDIS.sadd "searches/initial", query
+  else
+    REDIS.expire("searches:#{query}", configatron.cache_expiry)
+  end
 end
 
 process_queue(QUEUE)

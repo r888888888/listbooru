@@ -3,9 +3,18 @@ require "digest/md5"
 require "configatron"
 require "redis"
 require "json"
+require "logger"
 require "./config/config"
 
 REDIS = Redis.new
+LOGGER = Logger.new("/var/log/listbooru/sqs_processor.log", "a"))
+SQS = Aws::SQS::Client.new(
+  credentials: Aws::Credentials.new(
+    configatron.amazon_key,
+    configatron.amazon_secret
+  ),
+  region: configatron.sqs_region
+)
 
 helpers do
   def normalize_query(query)
@@ -16,18 +25,34 @@ helpers do
     tokens.join(" ")
   end
 
+  def send_sqs_message(string, options = {})
+    SQS.send_message(
+      options.merge(
+        message_body: string,
+        queue_url: configatron.sqs_url
+      )
+    )
+  rescue Exception => e
+    LOGGER.error(e.message)
+    LOGGER.error(e.backtrace.join("\n"))
+  end
+
+  def send_sqs_messages(strings, options = {})
+    strings.in_groups_of(10).each do |batch|
+      SQS.batch_send(batch.compact.map {|x| options.merge(message_body: x)})
+    end
+  rescue Exception => e
+    LOGGER.error(e.message)
+    LOGGER.error(e.backtrace.join("\n"))
+  end
+
   def aggregate_global(user_id)
     queries = REDIS.smembers("users:#{user_id}")
     limit = configatron.max_posts_per_search
 
     if queries.any? && REDIS.zcard("searches/user:#{user_id}") == 0
       REDIS.zunionstore "searches/user:#{user_id}", queries.map {|x| "searches:#{x}"}
-
-      REDIS.pipelined do
-        queries.each do |query|
-          REDIS.rpush("searches/clean", "g:#{user_id}:#{query}")
-        end
-      end
+      send_sqs_messages(queries.map {|x| "clean global\n#{user_id}\n#{x}"})
     end
 
     REDIS.zrevrange("searches/user:#{user_id}", 0, limit)
@@ -39,12 +64,7 @@ helpers do
 
     if queries.any? && REDIS.zcard("searches/user:#{user_id}:#{name}") == 0
       REDIS.zunionstore "searches/user:#{user_id}:#{name}", queries.map {|x| "searches:#{x}"}
-
-      REDIS.pipelined do
-        queries.each do |query|
-          REDIS.rpush("searches/clean", "n:#{user_id}:#{name}\x1f#{query}")
-        end
-      end
+      send_sqs_messages(queries.map {|x| "clean named\n#{user_id}\n#{name}\n#{x}"})
     end
 
     REDIS.zrevrange("searches/user:#{user_id}:#{name}", 0, limit)
@@ -70,60 +90,3 @@ get "/users" do
   results.to_json
 end
 
-delete "/searches" do
-  user_id = params["user_id"]
-
-  if params["all"]
-    REDIS.del("users:#{user_id}")
-    REDIS.scan_each(match: "users:#{user_id}:*") do |key|
-      REDIS.del(key)
-    end
-    REDIS.del("searches/user:#{user_id}")
-  else
-    query = normalize_query(params["query"])
-    name = params["name"]
-
-    REDIS.srem("users:#{user_id}", query)
-    REDIS.srem("users:#{user_id}:#{name}", query) if name
-  end
-  
-  ""
-end
-
-post "/searches" do
-  user_id = params["user_id"]
-  query = normalize_query(params["query"])
-  name = params["name"]
-
-  if REDIS.scard("users:#{user_id}") > configatron.max_searches_per_user
-    halt 409
-  else
-    REDIS.sadd("searches/initial", query) if REDIS.zcard("searches:#{query}") == 0
-    REDIS.sadd("users:#{user_id}:#{name}", query) if name
-    REDIS.sadd("users:#{user_id}", query)
-  end
-
-  ""
-end
-
-put "/searches" do
-  user_id = params["user_id"]
-  new_query = normalize_query(params["new_query"])
-  new_name = params["new_name"]
-  old_query = normalize_query(params["old_query"])
-  old_name = params["old_name"]
-
-  if old_query
-    REDIS.srem("users:#{user_id}", old_query)
-    REDIS.sadd("users:#{user_id}", new_query)
-  end
-
-  if old_name
-    REDIS.srem("users:#{user_id}:#{old_name}", old_query || new_query)
-    REDIS.sadd("users:#{user_id}:#{new_name}", new_query)
-  end
-
-  REDIS.sadd("searches/initial", new_query) if REDIS.zcard("searches:#{new_query}") == 0
-
-  ""
-end
