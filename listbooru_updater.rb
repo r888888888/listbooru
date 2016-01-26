@@ -9,13 +9,25 @@ require "./config/config"
 
 $options = {
   logfile: "/var/log/listbooru/processor.log",
+  init: false,
+  update: false
 }
 
 OptionParser.new do |opts|
   opts.on("--logfile=LOGFILE") do |logfile|
     $options[:logfile] = logfile
   end
-end
+
+  opts.on("--action=ACTION", ["init", "update"]) do |action|
+    case action
+    when "init"
+      $options[:init] = true
+
+    when "update"
+      $options[:update] = true
+    end
+  end
+end.parse!
 
 REDIS = Redis.new
 LOGFILE = File.open($options[:logfile], "a")
@@ -78,5 +90,6 @@ class Processor
 end
 
 processor = Processor.new
-processor.initialize_searches
-processor.update_searches
+processor.initialize_searches if $options[:init]
+processor.update_searches if $options[:update]
+
