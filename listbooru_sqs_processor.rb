@@ -96,7 +96,7 @@ def normalize_query(query)
 end
 
 def process_delete(tokens)
-  LOGGER.info "delete " + tokens.join(" ")
+  LOGGER.info tokens.join(" ")
 
   user_id = tokens[1]
   category = tokens[2]
@@ -116,7 +116,7 @@ def process_delete(tokens)
 end
 
 def process_create(tokens)
-  LOGGER.info "create " + tokens.join(" ")
+  LOGGER.info tokens.join(" ")
 
   user_id = tokens[1]
   category = tokens[2]
@@ -130,14 +130,14 @@ def process_create(tokens)
 end
 
 def process_refresh(tokens)
-  LOGGER.info "refresh " + tokens.join(" ")
+  LOGGER.info tokens.join(" ")
 
   user_id = tokens[1]
   REDIS.expire("searches/user:#{user_id}", 60 * 60)
 end
 
 def process_update(tokens)
-  LOGGER.info "update " + tokens.join(" ")
+  LOGGER.info tokens.join(" ")
 
   user_id = tokens[1]
   old_category = tokens[2]
@@ -159,7 +159,7 @@ def process_update(tokens)
 end
 
 def process_global_clean(tokens)
-  LOGGER.info "clean global " + tokens.join(" ")
+  LOGGER.info tokens.join(" ")
 
   user_id = tokens[1]
   query = tokens[2]
@@ -175,7 +175,7 @@ def process_global_clean(tokens)
 end
 
 def process_named_clean(tokens)
-  LOGGER.info "clean named " + tokens.join(" ")
+  LOGGER.info tokens.join(" ")
 
   user_id = tokens[1]
   name = tokens[2]
