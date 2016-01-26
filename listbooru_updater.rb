@@ -18,7 +18,9 @@ OptionParser.new do |opts|
 end
 
 REDIS = Redis.new
-LOGGER = Logger.new(File.open($options[:logfile], "a"))
+LOGFILE = File.open($options[:logfile], "a")
+LOGFILE.sync = true
+LOGGER = Logger.new(LOGFILE)
 
 class Processor
   def initialize_searches

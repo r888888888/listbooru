@@ -25,7 +25,9 @@ OptionParser.new do |opts|
   end
 end.parse!
 
-LOGGER = Logger.new(File.open($options[:logfile], "a"))
+LOGFILE = File.open($options[:logfile], "a")
+LOGFILE.sync = true
+LOGGER = Logger.new(LOGFILE)
 REDIS = Redis.new
 Aws.config.update(
   region: configatron.sqs_region,
