@@ -47,6 +47,18 @@ Signal.trap("TERM") do
   $running = false
 end
 
+def send_sqs_message(string, options = {})
+  SQS.send_message(
+    options.merge(
+      message_body: string,
+      queue_url: configatron.sqs_url
+    )
+  )
+rescue Exception => e
+  LOGGER.error(e.message)
+  LOGGER.error(e.backtrace.join("\n"))
+end
+
 def process_queue(poller)
   poller.before_request do
     unless $running
@@ -77,6 +89,9 @@ def process_queue(poller)
 
         when "clean named"
           process_named_clean(tokens)
+
+        when "initialize"
+          process_initialize(tokens)
 
         end
       end
@@ -125,7 +140,7 @@ def process_create(tokens)
   query = normalize_query(tokens[3])
 
   if REDIS.scard("users:#{user_id}") < configatron.max_searches_per_user
-    REDIS.sadd("searches/initial", query) unless REDIS.exists("searches:#{query}")
+    send_sqs_message("initialize\n#{query}") unless REDIS.exists("searches:#{query}")
     REDIS.sadd("users:#{user_id}:#{category}", query) if category
     REDIS.sadd("users:#{user_id}", query)
   end
@@ -159,7 +174,31 @@ def process_update(tokens)
     REDIS.sadd("users:#{user_id}:#{new_category}", new_query)
   end
 
-  REDIS.sadd("searches/initial", new_query) unless REDIS.exists("searches:#{new_query}")
+  send_sqs_message("initialize\n#{new_query}") unless REDIS.exists("searches:#{new_query}")
+end
+
+def process_initialize(tokens)
+  LOGGER.info tokens.join(" ")
+
+  query = tokens[1]
+
+  if !REDIS.exists("searches:#{query}")
+    resp = HTTParty.get("#{configatron.danbooru_server}/posts.json", query: {login: configatron.danbooru_user, api_key: configatron.danbooru_api_key, tags: query, limit: configatron.max_posts_per_search, ro: true})
+    if resp.code == 200
+      posts = JSON.parse(resp.body)
+      data = []
+      LOGGER.info "  results #{posts.size}"
+      posts.each do |post|
+        data << post['id']
+        data << post['id']
+      end
+      if data.any?
+        REDIS.zadd "searches:#{query}", data
+        REDIS.zremrangebyrank "searches:#{query}", 0, -configatron.max_posts_per_search
+        REDIS.expire "searches:#{query}", configatron.cache_expiry
+      end
+    end
+  end
 end
 
 def process_global_clean(tokens)
@@ -174,7 +213,7 @@ def process_global_clean(tokens)
   if REDIS.exists("searches:#{query}")
     REDIS.expire("searches:#{query}", configatron.cache_expiry)
   else
-    REDIS.sadd "searches/initial", query
+    send_sqs_message("initialize\n#{query}")
   end
 end
 
@@ -193,7 +232,7 @@ def process_named_clean(tokens)
   if REDIS.exists("searches:#{query}")
     REDIS.expire("searches:#{query}", configatron.cache_expiry)
   else
-    REDIS.sadd "searches/initial", query
+    send_sqs_message("initialize\n#{query}")
   end
 end
 
