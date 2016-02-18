@@ -151,7 +151,11 @@ def process_refresh(tokens)
 
   user_id = tokens[1]
   REDIS.sscan_each("users:#{user_id}") do |query|
-    REDIS.expire("searches:#{query}", configatron.cache_expiry)
+    if REDIS.exists("searches:#{query}")
+      REDIS.expire("searches:#{query}", configatron.cache_expiry)
+    else
+      send_sqs_message("initialize\n#{query}")
+    end
   end
 end
 
