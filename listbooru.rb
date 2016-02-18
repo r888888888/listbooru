@@ -50,7 +50,7 @@ helpers do
     queries = REDIS.smembers("users:#{user_id}")
     limit = configatron.max_posts_per_search
 
-    if queries.any? && REDIS.zcard("searches/user:#{user_id}") == 0
+    if queries.any? && !REDIS.exists("searches/user:#{user_id}")
       REDIS.zunionstore "searches/user:#{user_id}", queries.map {|x| "searches:#{x}"}
       send_sqs_messages(queries.map {|x| "clean global\n#{user_id}\n#{x}"})
     end
@@ -62,7 +62,7 @@ helpers do
     queries = REDIS.smembers("users:#{user_id}:#{name}")
     limit = configatron.max_posts_per_search
 
-    if queries.any? && REDIS.zcard("searches/user:#{user_id}:#{name}") == 0
+    if queries.any? && !REDIS.exists("searches/user:#{user_id}:#{name}")
       REDIS.zunionstore "searches/user:#{user_id}:#{name}", queries.map {|x| "searches:#{x}"}
       send_sqs_messages(queries.map {|x| "clean named\n#{user_id}\n#{name}\n#{x}"})
     end

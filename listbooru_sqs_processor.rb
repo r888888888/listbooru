@@ -125,7 +125,7 @@ def process_create(tokens)
   query = normalize_query(tokens[3])
 
   if REDIS.scard("users:#{user_id}") < configatron.max_searches_per_user
-    REDIS.sadd("searches/initial", query) if REDIS.zcard("searches:#{query}") == 0
+    REDIS.sadd("searches/initial", query) unless REDIS.exists("searches:#{query}")
     REDIS.sadd("users:#{user_id}:#{category}", query) if category
     REDIS.sadd("users:#{user_id}", query)
   end
@@ -135,7 +135,9 @@ def process_refresh(tokens)
   LOGGER.info tokens.join(" ")
 
   user_id = tokens[1]
-  REDIS.expire("searches/user:#{user_id}", 60 * 60)
+  REDIS.sscan_each("users:#{user_id}") do |query|
+    REDIS.expire("searches:#{query}", configatron.cache_expiry)
+  end
 end
 
 def process_update(tokens)
@@ -157,7 +159,7 @@ def process_update(tokens)
     REDIS.sadd("users:#{user_id}:#{new_category}", new_query)
   end
 
-  REDIS.sadd("searches/initial", new_query) if REDIS.zcard("searches:#{new_query}") == 0
+  REDIS.sadd("searches/initial", new_query) unless REDIS.exists("searches:#{new_query}")
 end
 
 def process_global_clean(tokens)
@@ -169,10 +171,10 @@ def process_global_clean(tokens)
   REDIS.zremrangebyrank "searches/user:#{user_id}", 0, -configatron.max_posts_per_search
   REDIS.expire("searches/user:#{user_id}", 60 * 60)
 
-  if REDIS.zcard("searches:#{query}") == 0
-    REDIS.sadd "searches/initial", query
-  else
+  if REDIS.exists("searches:#{query}")
     REDIS.expire("searches:#{query}", configatron.cache_expiry)
+  else
+    REDIS.sadd "searches/initial", query
   end
 end
 
@@ -188,10 +190,10 @@ def process_named_clean(tokens)
   REDIS.zremrangebyrank "searches/user:#{user_id}:#{name}", 0, -configatron.max_posts_per_search
   REDIS.expire("searches/user:#{user_id}:name", 60 * 60)
 
-  if REDIS.zcard("searches:#{query}") == 0
-    REDIS.sadd "searches/initial", query
-  else
+  if REDIS.exists("searches:#{query}")
     REDIS.expire("searches:#{query}", configatron.cache_expiry)
+  else
+    REDIS.sadd "searches/initial", query
   end
 end
 

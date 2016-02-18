@@ -39,7 +39,7 @@ class Processor
     while true
       query = REDIS.spop("searches/initial")
       break if query.nil?
-      if REDIS.zcard("searches:#{query}") == 0
+      if !REDIS.exists("searches:#{query}")
         LOGGER.info "initializing #{query}"
         resp = HTTParty.get("#{configatron.danbooru_server}/posts.json", query: {login: configatron.danbooru_user, api_key: configatron.danbooru_api_key, tags: query, limit: configatron.max_posts_per_search, ro: true})
         if resp.code == 200
