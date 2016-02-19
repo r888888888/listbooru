@@ -5,6 +5,7 @@ require "configatron"
 require "logger"
 require "aws-sdk"
 require 'optparse'
+require "httparty"
 require "./config/config"
 
 Process.daemon
