@@ -18,6 +18,29 @@ SQS = Aws::SQS::Client.new(
 )
 
 helpers do
+  def in_groups_of(array, number, fill_with = nil)
+    if number.to_i <= 0
+      raise ArgumentError,
+        "Group size must be a positive integer, was #{number.inspect}"
+    end
+
+    if fill_with == false
+      collection = array
+    else
+      # size % number gives how many extra we have;
+      # subtracting from number gives how many to add;
+      # modulo number ensures we don't add group of just fill.
+      padding = (number - array.size % number) % number
+      collection = array.dup.concat(Array.new(padding, fill_with))
+    end
+
+    if block_given?
+      collection.each_slice(number) { |slice| yield(slice) }
+    else
+      collection.each_slice(number).to_a
+    end
+  end
+
   def normalize_query(query)
     tokens = query.downcase.scan(/\S+/)
     return "no-matches" if tokens.size == 0
@@ -39,7 +62,7 @@ helpers do
   end
 
   def send_sqs_messages(strings, options = {})
-    strings.in_groups_of(10).each do |batch|
+    in_groups_of(strings, 10) do |batch|
       SQS.batch_send(batch.compact.map {|x| options.merge(message_body: x)})
     end
   rescue Exception => e
