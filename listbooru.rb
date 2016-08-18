@@ -4,6 +4,7 @@ require "configatron"
 require "redis"
 require "json"
 require "logger"
+require "aws-sdk"
 require "./config/config"
 
 REDIS = Redis.new
