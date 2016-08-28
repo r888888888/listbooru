@@ -91,6 +91,9 @@ def process_queue(poller)
         when "clean named"
           process_named_clean(tokens)
 
+        when "rename"
+          process_rename(tokens)
+
         when "initialize"
           process_initialize(tokens)
 
@@ -226,19 +229,30 @@ def process_named_clean(tokens)
   LOGGER.info tokens.join(" ")
 
   user_id = tokens[1]
-  name = tokens[2]
+  category = tokens[2]
   query = tokens[3]
 
   REDIS.zremrangebyrank "searches/user:#{user_id}", 0, -configatron.max_posts_per_search
   REDIS.expire("searches/user:#{user_id}", 60 * 60)
-  REDIS.zremrangebyrank "searches/user:#{user_id}:#{name}", 0, -configatron.max_posts_per_search
-  REDIS.expire("searches/user:#{user_id}:name", 60 * 60)
+  REDIS.zremrangebyrank "searches/user:#{user_id}:#{category}", 0, -configatron.max_posts_per_search
+  REDIS.expire("searches/user:#{user_id}:#{category}", 60 * 60)
 
   if REDIS.exists("searches:#{query}")
     REDIS.expire("searches:#{query}", configatron.cache_expiry)
   else
     send_sqs_message("initialize\n#{query}")
   end
+end
+
+def process_rename(tokens)
+  LOGGER.info tokens.join(" ")
+
+  user_id = tokens[1]
+  old_category = tokens[2]
+  new_category = tokens[3]
+
+  REDIS.rename("users:#{user_id}:#{old_category}", "users:#{user_id}:#{new_category}")
+  REDIS.rename("searches/user:#{user_id}:#{old_category}", "searches/user:#{user_id}:#{new_category}")
 end
 
 process_queue(QUEUE)
