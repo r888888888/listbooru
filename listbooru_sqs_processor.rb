@@ -251,8 +251,8 @@ def process_rename(tokens)
   old_category = tokens[2]
   new_category = tokens[3]
 
-  REDIS.rename("users:#{user_id}:#{old_category}", "users:#{user_id}:#{new_category}")
-  REDIS.rename("searches/user:#{user_id}:#{old_category}", "searches/user:#{user_id}:#{new_category}")
+  REDIS.rename("users:#{user_id}:#{old_category}", "users:#{user_id}:#{new_category}") rescue Redis::CommandError
+  REDIS.rename("searches/user:#{user_id}:#{old_category}", "searches/user:#{user_id}:#{new_category}") rescue Redis::CommandError
 end
 
 process_queue(QUEUE)
