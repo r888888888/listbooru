@@ -20,7 +20,7 @@ end.parse!
 REDIS = Redis.new
 LOGFILE = File.open($options[:logfile], "a")
 LOGFILE.sync = true
-LOGGER = Logger.new(LOGFILE)
+LOGGER = Logger.new(LOGFILE, 0)
 
 min_date = (Date.today - 3).strftime("%Y-%m-%d")
 

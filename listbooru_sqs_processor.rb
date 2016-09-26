@@ -28,7 +28,7 @@ end.parse!
 
 LOGFILE = File.open($options[:logfile], "a")
 LOGFILE.sync = true
-LOGGER = Logger.new(LOGFILE)
+LOGGER = Logger.new(LOGFILE, 0)
 REDIS = Redis.new
 Aws.config.update(
   region: configatron.sqs_region,

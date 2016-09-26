@@ -8,7 +8,8 @@ require "aws-sdk"
 require "./config/config"
 
 REDIS = Redis.new
-LOGGER = Logger.new("/var/log/listbooru/sqs_processor.log", "a")
+LOGFILE = ENV["LOG"] || "/var/log/listbooru/sqs_processor.log"
+LOGGER = Logger.new(LOGFILE, "a")
 SQS = Aws::SQS::Client.new(
   credentials: Aws::Credentials.new(
     configatron.amazon_key,
