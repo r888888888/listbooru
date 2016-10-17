@@ -8,6 +8,7 @@ gem "httparty"
 gem "configatron"
 gem "whenever"
 gem "aws-sdk", "~> 2"
+gem "figaro"
 
 group :production do
   gem 'unicorn', :platforms => :ruby
