@@ -8,8 +8,8 @@ require "aws-sdk"
 require "./config/config"
 
 REDIS = Redis.new
-LOGFILE = ENV["LOG"] || "/var/log/listbooru/sqs_processor.log"
-LOGGER = Logger.new(LOGFILE, "a")
+LOGFILE = ENV["LOG"] || "/var/log/listbooru/listbooru.log"
+LOGGER = Logger.new(LOGFILE, 0)
 SQS = Aws::SQS::Client.new(
   credentials: Aws::Credentials.new(
     configatron.amazon_key,
@@ -58,16 +58,16 @@ helpers do
       )
     )
   rescue Exception => e
-    LOGGER.error(e.message)
+    LOGGER.error(e.to_s)
     LOGGER.error(e.backtrace.join("\n"))
   end
 
   def send_sqs_messages(strings, options = {})
     in_groups_of(strings, 10) do |batch|
-      SQS.batch_send(batch.compact.map {|x| options.merge(message_body: x)})
+      SQS.send_message_batch(queue_url: configatron.sqs_url, entries: batch.compact.map {|x| options.merge(message_body: x)})
     end
   rescue Exception => e
-    LOGGER.error(e.message)
+    LOGGER.error(e.to_s)
     LOGGER.error(e.backtrace.join("\n"))
   end
 
