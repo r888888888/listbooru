@@ -1,3 +1,6 @@
+require "dotenv"
+Dotenv.load
+
 require "date"
 require "digest/md5"
 require "redis"

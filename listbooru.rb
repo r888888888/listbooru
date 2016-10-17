@@ -1,3 +1,6 @@
+require "dotenv"
+Dotenv.load
+
 require "sinatra"
 require "digest/md5"
 require "configatron"

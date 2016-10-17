@@ -1,5 +1,8 @@
 #!/home/danbooru/.rbenv/shims/ruby
 
+require "dotenv"
+Dotenv.load
+
 require "redis"
 require "configatron"
 require "logger"
