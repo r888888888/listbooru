@@ -8,6 +8,7 @@ require "redis"
 require "json"
 require "logger"
 require "aws-sdk"
+require "cityhash"
 require "./config/config"
 
 REDIS = Redis.new
