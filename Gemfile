@@ -9,6 +9,7 @@ gem "configatron"
 gem "whenever"
 gem "aws-sdk", "~> 2"
 gem "dotenv"
+gem "cityhash"
 
 group :production do
   gem 'unicorn', :platforms => :ruby

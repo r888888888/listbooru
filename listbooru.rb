@@ -67,7 +67,11 @@ helpers do
 
   def send_sqs_messages(strings, options = {})
     in_groups_of(strings, 10) do |batch|
-      SQS.send_message_batch(queue_url: configatron.sqs_url, entries: batch.compact.map {|x| options.merge(message_body: x)})
+      entries = batch.compact.map do |x| 
+        options.merge(message_body: x, id: CityHash.hash64(x).to_s)
+      end
+
+      SQS.send_message_batch(queue_url: configatron.sqs_url, entries: entries)
     end
   rescue Exception => e
     LOGGER.error(e.to_s)
