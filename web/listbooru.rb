@@ -101,10 +101,14 @@ helpers do
   end
 end
 
-before do
+before "/users" do
   if params["key"] != ENV["LISTBOORU_AUTH_KEY"]
     halt 401
   end
+end
+
+get "/" do
+  redirect "/index.html"
 end
 
 get "/users" do
