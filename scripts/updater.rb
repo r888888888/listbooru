@@ -4,11 +4,9 @@ Dotenv.load
 require "date"
 require "digest/md5"
 require "redis"
-require "configatron"
 require "httparty"
 require "logger"
 require 'optparse'
-require "./config/config"
 
 $options = {
   logfile: "/var/log/listbooru/processor.log"
@@ -31,7 +29,7 @@ REDIS.scan_each(match: "searches:*") do |key|
   key =~ /^searches:(.+)/
   query = $1
   LOGGER.info "updating #{query}"
-  resp = HTTParty.get("#{configatron.danbooru_server}/posts.json", query: {login: configatron.danbooru_user, api_key: configatron.danbooru_api_key, tags: "#{query} date:>#{min_date}", limit: configatron.max_posts_per_search, ro: true})
+  resp = HTTParty.get("#{ENV["LISTBOORU_DANBOORU_SERVER"]}/posts.json", query: {login: ENV["LISTBOORU_DANBOORU_USER"], api_key: ENV["LISTBOORU_DANBOORU_API_KEY"], tags: "#{query} date:>#{min_date}", limit: ENV["MAX_POSTS_PER_SEARCH"].to_i, ro: true})
 
   if resp.code == 200
     posts = JSON.parse(resp.body)
@@ -44,7 +42,7 @@ REDIS.scan_each(match: "searches:*") do |key|
     if data.any?
       REDIS.zadd "searches:#{query}", data
     end
-    REDIS.zremrangebyrank "searches:#{query}", 0, -configatron.max_posts_per_search
+    REDIS.zremrangebyrank "searches:#{query}", 0, -ENV["MAX_POSTS_PER_SEARCH"].to_i
   end
   sleep 1
 end

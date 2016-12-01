@@ -3,23 +3,20 @@ Dotenv.load
 
 require "sinatra"
 require "digest/md5"
-require "configatron"
 require "redis"
 require "json"
-require "logger"
 require "aws-sdk"
 require "cityhash"
-require "./config/config"
+
+set :port, ENV["SINATRA_PORT"]
 
 REDIS = Redis.new
-LOGFILE = ENV["LOG"] || "/var/log/listbooru/listbooru.log"
-LOGGER = Logger.new(LOGFILE, 0)
 SQS = Aws::SQS::Client.new(
   credentials: Aws::Credentials.new(
-    configatron.amazon_key,
-    configatron.amazon_secret
+    ENV["AMAZON_KEY"],
+    ENV["AMAZON_SECRET"]
   ),
-  region: configatron.sqs_region
+  region: ENV["AWS_REGION"]
 )
 
 helpers do
@@ -58,12 +55,12 @@ helpers do
     SQS.send_message(
       options.merge(
         message_body: string,
-        queue_url: configatron.sqs_url
+        queue_url: ENV["LISTBOORU_SQS_URL"]
       )
     )
   rescue Exception => e
-    LOGGER.error(e.to_s)
-    LOGGER.error(e.backtrace.join("\n"))
+    logger.error(e.to_s)
+    logger.error(e.backtrace.join("\n"))
   end
 
   def send_sqs_messages(strings, options = {})
@@ -72,16 +69,16 @@ helpers do
         options.merge(message_body: x, id: CityHash.hash64(x).to_s)
       end
 
-      SQS.send_message_batch(queue_url: configatron.sqs_url, entries: entries)
+      SQS.send_message_batch(queue_url: ENV["LISTBOORU_SQS_URL"], entries: entries)
     end
   rescue Exception => e
-    LOGGER.error(e.to_s)
-    LOGGER.error(e.backtrace.join("\n"))
+    logger.error(e.to_s)
+    logger.error(e.backtrace.join("\n"))
   end
 
   def aggregate_global(user_id)
     queries = REDIS.smembers("users:#{user_id}")
-    limit = configatron.max_posts_per_search
+    limit = ENV["MAX_POSTS_PER_SEARCH"].to_i
 
     if queries.any? && !REDIS.exists("searches/user:#{user_id}")
       REDIS.zunionstore "searches/user:#{user_id}", queries.map {|x| "searches:#{x}"}
@@ -93,7 +90,7 @@ helpers do
 
   def aggregate_named(user_id, name)
     queries = REDIS.smembers("users:#{user_id}:#{name}")
-    limit = configatron.max_posts_per_search
+    limit = ENV["MAX_POSTS_PER_SEARCH"].to_i
 
     if queries.any? && !REDIS.exists("searches/user:#{user_id}:#{name}")
       REDIS.zunionstore "searches/user:#{user_id}:#{name}", queries.map {|x| "searches:#{x}"}
@@ -105,7 +102,7 @@ helpers do
 end
 
 before do
-  if params["key"] != configatron.auth_key
+  if params["key"] != ENV["LISTBOORU_AUTH_KEY"]
     halt 401
   end
 end

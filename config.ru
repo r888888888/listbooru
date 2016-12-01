@@ -1,2 +1,2 @@
-require './listbooru'
+require './web/listbooru'
 run Sinatra::Application

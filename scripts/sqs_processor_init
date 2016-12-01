@@ -16,34 +16,34 @@ NAME=listbooru_sqs_service
 CHUID=danbooru
 LOGFILE=/var/log/listbooru/listbooru.log
 DESC="listbooru sqs service"
-PIDFILE=/var/run/listbooru/ruby-service.pid
+PIDFILE=/var/run/listbooru/sqs_processor.pid
 ROOT_DIR=/var/www/listbooru/current
-DAEMON=listbooru_sqs_processor.rb
+DAEMON=services/sqs_processor.rb
 DAEMON_CMD="bundle exec ruby $DAEMON --pidfile=$PIDFILE"
 
 case "$1" in
     start)
-	echo -n "Starting daemon: "$NAME
-	start-stop-daemon --start --pidfile $PIDFILE --chuid $CHUID --chdir $ROOT_DIR --exec /bin/bash -- -l -c "$DAEMON_CMD" > $LOGFILE
-	echo "."
-	;;
+  echo -n "Starting daemon: "$NAME
+  start-stop-daemon --start --pidfile $PIDFILE --chuid $CHUID --chdir $ROOT_DIR --exec /bin/bash -- -l -c "$DAEMON_CMD" > $LOGFILE
+  echo "."
+  ;;
 
     stop)
-	echo -n "Stopping daemon: "$NAME
-	start-stop-daemon --stop --pidfile $PIDFILE --oknodo --chuid $CHUID --remove-pidfile > $LOGFILE
-	echo "."
-	;;
+  echo -n "Stopping daemon: "$NAME
+  start-stop-daemon --stop --pidfile $PIDFILE --oknodo --chuid $CHUID --remove-pidfile > $LOGFILE
+  echo "."
+  ;;
 
     restart)
-	echo -n "Restarting daemon: "$NAME
-	start-stop-daemon --stop --retry 30 --pidfile $PIDFILE --oknodo --chuid $CHUID --remove-pidfile > $LOGFILE
-	start-stop-daemon --start --quiet --pidfile $PIDFILE --exec /bin/bash --chuid $CHUID --chdir $ROOT_DIR -- -l -c "$DAEMON_CMD" > $LOGFILE
-	echo "."
-	;;
+  echo -n "Restarting daemon: "$NAME
+  start-stop-daemon --stop --retry 30 --pidfile $PIDFILE --oknodo --chuid $CHUID --remove-pidfile > $LOGFILE
+  start-stop-daemon --start --quiet --pidfile $PIDFILE --exec /bin/bash --chuid $CHUID --chdir $ROOT_DIR -- -l -c "$DAEMON_CMD" > $LOGFILE
+  echo "."
+  ;;
 
     *)
-	echo "Usage: "$1" {start|stop|restart}"
-	exit 1
+  echo "Usage: "$1" {start|stop|restart}"
+  exit 1
 
 esac
 

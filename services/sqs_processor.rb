@@ -1,17 +1,17 @@
-#!/home/danbooru/.rbenv/shims/ruby
+#!/usr/bin/env ruby
 
 require "dotenv"
 Dotenv.load
 
 require "redis"
-require "configatron"
 require "logger"
 require "aws-sdk"
 require 'optparse'
 require "httparty"
-require "./config/config"
 
-Process.daemon
+unless ENV["RUN"]
+  Process.daemon
+end
 
 $running = true
 $options = {
@@ -29,19 +29,19 @@ OptionParser.new do |opts|
   end
 end.parse!
 
-LOGFILE = File.open($options[:logfile], "a")
+LOGFILE = $options[:logfile] == "stdout" ? STDOUT : File.open($options[:logfile], "a")
 LOGFILE.sync = true
 LOGGER = Logger.new(LOGFILE, 0)
 REDIS = Redis.new
 Aws.config.update(
-  region: configatron.sqs_region,
+  region: ENV["LISTBOORU_SQS_REGION"],
   credentials: Aws::Credentials.new(
-    configatron.amazon_key,
-    configatron.amazon_secret
+    ENV["AMAZON_KEY"],
+    ENV["AMAZON_SECRET"]
   )
 )
 SQS = Aws::SQS::Client.new
-QUEUE = Aws::SQS::QueuePoller.new(configatron.sqs_url, client: SQS)
+QUEUE = Aws::SQS::QueuePoller.new(ENV["LISTBOORU_SQS_URL"], client: SQS)
 
 File.open($options[:pidfile], "w") do |f|
   f.write(Process.pid)
@@ -55,7 +55,7 @@ def send_sqs_message(string, options = {})
   SQS.send_message(
     options.merge(
       message_body: string,
-      queue_url: configatron.sqs_url
+      queue_url: ENV["LISTBOORU_SQS_URL"]
     )
   )
 rescue Exception => e
@@ -102,9 +102,13 @@ def process_queue(poller)
 
         end
       end
+    rescue Interrupt
+      exit(0)
+
     rescue Exception => e
       LOGGER.error(e.message)
       LOGGER.error(e.backtrace.join("\n"))
+
       sleep(60)
       retry
     end
@@ -146,7 +150,7 @@ def process_create(tokens)
   category = tokens[2]
   query = normalize_query(tokens[3])
 
-  if REDIS.scard("users:#{user_id}") < configatron.max_searches_per_user
+  if REDIS.scard("users:#{user_id}") < ENV["MAX_SEARCHES_PER_USER"].to_i
     send_sqs_message("initialize\n#{query}") unless REDIS.exists("searches:#{query}")
     REDIS.sadd("users:#{user_id}:#{category}", query) if category
     REDIS.sadd("users:#{user_id}", query)
@@ -159,7 +163,7 @@ def process_refresh(tokens)
   user_id = tokens[1]
   REDIS.sscan_each("users:#{user_id}") do |query|
     if REDIS.exists("searches:#{query}")
-      REDIS.expire("searches:#{query}", configatron.cache_expiry)
+      REDIS.expire("searches:#{query}", ENV["CACHE_EXPIRY"].to_i)
     else
       send_sqs_message("initialize\n#{query}")
     end
@@ -194,7 +198,7 @@ def process_initialize(tokens)
   query = tokens[1]
 
   if !REDIS.exists("searches:#{query}")
-    resp = HTTParty.get("#{configatron.danbooru_server}/posts.json", query: {login: configatron.danbooru_user, api_key: configatron.danbooru_api_key, tags: query, limit: configatron.max_posts_per_search, ro: true})
+    resp = HTTParty.get("#{ENV['LISTBOORU_DANBOORU_SERVER']}/posts.json", query: {login: ENV["LISTBOORU_DANBOORU_USER"], api_key: ENV["LISTBOORU_DANBOORU_API_KEY"], tags: query, limit: ENV["MAX_POSTS_PER_SEARCH"].to_i, ro: true})
     if resp.code == 200
       posts = JSON.parse(resp.body)
       data = []
@@ -205,8 +209,8 @@ def process_initialize(tokens)
       end
       if data.any?
         REDIS.zadd "searches:#{query}", data
-        REDIS.zremrangebyrank "searches:#{query}", 0, -configatron.max_posts_per_search
-        REDIS.expire "searches:#{query}", configatron.cache_expiry
+        REDIS.zremrangebyrank "searches:#{query}", 0, -ENV["MAX_POSTS_PER_SEARCH"].to_i
+        REDIS.expire "searches:#{query}", ENV["CACHE_EXPIRY"].to_i
       end
     end
   end
@@ -218,11 +222,11 @@ def process_global_clean(tokens)
   user_id = tokens[1]
   query = tokens[2]
 
-  REDIS.zremrangebyrank "searches/user:#{user_id}", 0, -configatron.max_posts_per_search
+  REDIS.zremrangebyrank "searches/user:#{user_id}", 0, -ENV["MAX_POSTS_PER_SEARCH"].to_i
   REDIS.expire("searches/user:#{user_id}", 60 * 60)
 
   if REDIS.exists("searches:#{query}")
-    REDIS.expire("searches:#{query}", configatron.cache_expiry)
+    REDIS.expire("searches:#{query}", ENV["CACHE_EXPIRY"].to_i)
   else
     send_sqs_message("initialize\n#{query}")
   end
@@ -235,13 +239,13 @@ def process_named_clean(tokens)
   category = tokens[2]
   query = tokens[3]
 
-  REDIS.zremrangebyrank "searches/user:#{user_id}", 0, -configatron.max_posts_per_search
+  REDIS.zremrangebyrank "searches/user:#{user_id}", 0, -ENV["MAX_POSTS_PER_SEARCH"].to_i
   REDIS.expire("searches/user:#{user_id}", 60 * 60)
-  REDIS.zremrangebyrank "searches/user:#{user_id}:#{category}", 0, -configatron.max_posts_per_search
+  REDIS.zremrangebyrank "searches/user:#{user_id}:#{category}", 0, -ENV["MAX_POSTS_PER_SEARCH"].to_i
   REDIS.expire("searches/user:#{user_id}:#{category}", 60 * 60)
 
   if REDIS.exists("searches:#{query}")
-    REDIS.expire("searches:#{query}", configatron.cache_expiry)
+    REDIS.expire("searches:#{query}", ENV["CACHE_EXPIRY"].to_i)
   else
     send_sqs_message("initialize\n#{query}")
   end
