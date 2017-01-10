@@ -29,7 +29,7 @@ REDIS.scan_each(match: "searches:*") do |key|
   key =~ /^searches:(.+)/
   query = $1
   LOGGER.info "updating #{query}"
-  resp = HTTParty.get("#{ENV["LISTBOORU_DANBOORU_SERVER"]}/posts.json", query: {login: ENV["LISTBOORU_DANBOORU_USER"], api_key: ENV["LISTBOORU_DANBOORU_API_KEY"], tags: "#{query} date:>#{min_date}", limit: ENV["MAX_POSTS_PER_SEARCH"].to_i, ro: true})
+  resp = HTTParty.get("#{ENV["LISTBOORU_DANBOORU_SERVER"]}/posts.json", query: {login: ENV["LISTBOORU_DANBOORU_USER"], api_key: ENV["LISTBOORU_DANBOORU_API_KEY"], tags: query, limit: ENV["MAX_POSTS_PER_SEARCH"].to_i, ro: true})
 
   if resp.code == 200
     posts = JSON.parse(resp.body)
@@ -39,10 +39,10 @@ REDIS.scan_each(match: "searches:*") do |key|
       data << post['id']
       data << post['id']
     end
+    REDIS.del(key)
     if data.any?
-      REDIS.zadd "searches:#{query}", data
+      REDIS.zadd key, data
     end
-    REDIS.zremrangebyrank "searches:#{query}", 0, -ENV["MAX_POSTS_PER_SEARCH"].to_i
   end
   sleep 1
 end
