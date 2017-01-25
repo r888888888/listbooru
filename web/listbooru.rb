@@ -115,7 +115,7 @@ get "/users" do
   user_id = params["user_id"]
   name = params["name"]
 
-  if name
+  if params.has_key?("name")
     results = aggregate_named(user_id, name)
   else
     results = aggregate_global(user_id)
