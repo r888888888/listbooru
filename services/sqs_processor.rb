@@ -76,25 +76,25 @@ def process_queue(poller)
         tokens = msg.body.split(/\n/)
 
         case tokens[0]
-        when "delete"
+        when "delete" # TODO: remove
           process_delete(tokens)
 
-        when "create"
+        when "create" # TODO: remove
           process_create(tokens)
 
-        when "refresh"
+        when "refresh" # TODO: remove
           process_refresh(tokens)
 
-        when "update"
+        when "update" # TODO: remove
           process_update(tokens)
 
-        when "clean global"
+        when "clean global" # TODO: remove
           process_global_clean(tokens)
 
-        when "clean named"
+        when "clean named" # TODO: remove
           process_named_clean(tokens)
 
-        when "rename"
+        when "rename" # TODO: remove
           process_rename(tokens)
 
         when "initialize"
@@ -123,6 +123,7 @@ def normalize_query(query)
   tokens.join(" ")
 end
 
+# TODO: remove
 def process_delete(tokens)
   LOGGER.info tokens.join(" ")
 
@@ -143,6 +144,7 @@ def process_delete(tokens)
   end
 end
 
+# TODO: remove
 def process_create(tokens)
   LOGGER.info tokens.join(" ")
 
@@ -157,6 +159,7 @@ def process_create(tokens)
   end
 end
 
+# TODO: remove
 def process_refresh(tokens)
   LOGGER.info tokens.join(" ")
 
@@ -170,6 +173,7 @@ def process_refresh(tokens)
   end
 end
 
+# TODO: remove
 def process_update(tokens)
   LOGGER.info tokens.join(" ")
 
@@ -216,6 +220,7 @@ def process_initialize(tokens)
   end
 end
 
+# TODO: remove
 def process_global_clean(tokens)
   LOGGER.info tokens.join(" ")
 
@@ -232,6 +237,7 @@ def process_global_clean(tokens)
   end
 end
 
+# TODO: remove
 def process_named_clean(tokens)
   LOGGER.info tokens.join(" ")
 
@@ -251,6 +257,7 @@ def process_named_clean(tokens)
   end
 end
 
+# TODO: remove
 def process_rename(tokens)
   LOGGER.info tokens.join(" ")
 

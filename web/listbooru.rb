@@ -64,7 +64,7 @@ helpers do
   end
 
   def send_sqs_messages(strings, options = {})
-    in_groups_of(strings, 10) do |batch|
+    in_groups_of(strings, 100) do |batch|
       entries = batch.compact.map do |x| 
         options.merge(message_body: x, id: CityHash.hash64(x).to_s)
       end
@@ -76,6 +76,19 @@ helpers do
     logger.error(e.backtrace.join("\n"))
   end
 
+  def aggregate_searches(queries)
+    send_sqs_messages(queries.map {|x| "initialize\n#{x}"})
+    key = "searches-agg:" + CityHash.hash64(queries.join(" ")).to_s(36)
+
+    if !REDIS.exists(key)
+      REDIS.zunionstore key, queries.map {|x| "searches:#{x}"}
+      REDIS.expire key, 3600
+    end
+
+    REDIS.zrevrange(key, 0, ENV["MAX_POSTS_PER_SEARCH"].to_i)
+  end
+
+  # TODO: REMOVE
   def aggregate_global(user_id)
     queries = REDIS.smembers("users:#{user_id}")
     limit = ENV["MAX_POSTS_PER_SEARCH"].to_i
@@ -88,6 +101,7 @@ helpers do
     REDIS.zrevrange("searches/user:#{user_id}", 0, limit)
   end
 
+  # TODO: REMOVE
   def aggregate_named(user_id, name)
     queries = REDIS.smembers("users:#{user_id}:#{name}")
     limit = ENV["MAX_POSTS_PER_SEARCH"].to_i
@@ -101,6 +115,7 @@ helpers do
   end
 end
 
+# TODO: REMOVE
 before "/users" do
   if params["key"] != ENV["LISTBOORU_AUTH_KEY"]
     halt 401
@@ -111,6 +126,18 @@ get "/" do
   redirect "/index.html"
 end
 
+post "/v2/search" do
+  request.body.rewind
+  json = JSON.parse(request.body.read)
+  if json["key"] != ENV["LISTBOORU_AUTH_KEY"]
+    halt 401
+  else
+    queries = json["queries"]
+    aggregate_searches(queries).join(" ")
+  end
+end
+
+# TODO: REMOVE
 get "/users" do
   user_id = params["user_id"]
   name = params["name"]
@@ -123,4 +150,3 @@ get "/users" do
 
   results.to_json
 end
-
