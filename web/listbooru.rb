@@ -87,39 +87,6 @@ helpers do
 
     REDIS.zrevrange(key, 0, ENV["MAX_POSTS_PER_SEARCH"].to_i)
   end
-
-  # TODO: REMOVE
-  def aggregate_global(user_id)
-    queries = REDIS.smembers("users:#{user_id}")
-    limit = ENV["MAX_POSTS_PER_SEARCH"].to_i
-
-    if queries.any? && !REDIS.exists("searches/user:#{user_id}")
-      REDIS.zunionstore "searches/user:#{user_id}", queries.map {|x| "searches:#{x}"}
-      send_sqs_messages(queries.map {|x| "clean global\n#{user_id}\n#{x}"})
-    end
-
-    REDIS.zrevrange("searches/user:#{user_id}", 0, limit)
-  end
-
-  # TODO: REMOVE
-  def aggregate_named(user_id, name)
-    queries = REDIS.smembers("users:#{user_id}:#{name}")
-    limit = ENV["MAX_POSTS_PER_SEARCH"].to_i
-
-    if queries.any? && !REDIS.exists("searches/user:#{user_id}:#{name}")
-      REDIS.zunionstore "searches/user:#{user_id}:#{name}", queries.map {|x| "searches:#{x}"}
-      send_sqs_messages(queries.map {|x| "clean named\n#{user_id}\n#{name}\n#{x}"})
-    end
-
-    REDIS.zrevrange("searches/user:#{user_id}:#{name}", 0, limit)
-  end
-end
-
-# TODO: REMOVE
-before "/users" do
-  if params["key"] != ENV["LISTBOORU_AUTH_KEY"]
-    halt 401
-  end
 end
 
 get "/" do
@@ -135,18 +102,4 @@ post "/v2/search" do
     queries = json["queries"]
     aggregate_searches(queries).join(" ")
   end
-end
-
-# TODO: REMOVE
-get "/users" do
-  user_id = params["user_id"]
-  name = params["name"]
-
-  if params.has_key?("name")
-    results = aggregate_named(user_id, name)
-  else
-    results = aggregate_global(user_id)
-  end
-
-  results.to_json
 end

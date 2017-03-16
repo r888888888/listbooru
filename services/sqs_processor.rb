@@ -76,27 +76,6 @@ def process_queue(poller)
         tokens = msg.body.split(/\n/)
 
         case tokens[0]
-        when "delete" # TODO: remove
-          process_delete(tokens)
-
-        when "create" # TODO: remove
-          process_create(tokens)
-
-        when "refresh" # TODO: remove
-          process_refresh(tokens)
-
-        when "update" # TODO: remove
-          process_update(tokens)
-
-        when "clean global" # TODO: remove
-          process_global_clean(tokens)
-
-        when "clean named" # TODO: remove
-          process_named_clean(tokens)
-
-        when "rename" # TODO: remove
-          process_rename(tokens)
-
         when "initialize"
           process_initialize(tokens)
 
@@ -123,79 +102,6 @@ def normalize_query(query)
   tokens.join(" ")
 end
 
-# TODO: remove
-def process_delete(tokens)
-  LOGGER.info tokens.join(" ")
-
-  user_id = tokens[1]
-  category = tokens[2]
-  query = tokens[3]
-
-  if category == "all"
-    REDIS.del("users:#{user_id}")
-    REDIS.scan_each(match: "users:#{user_id}:*") do |key|
-      REDIS.del(key)
-    end
-    REDIS.del("searches/user:#{user_id}")
-  else
-    query = normalize_query(query)
-    REDIS.srem("users:#{user_id}", query)
-    REDIS.srem("users:#{user_id}:#{category}", query) if category
-  end
-end
-
-# TODO: remove
-def process_create(tokens)
-  LOGGER.info tokens.join(" ")
-
-  user_id = tokens[1]
-  category = tokens[2]
-  query = normalize_query(tokens[3])
-
-  if REDIS.scard("users:#{user_id}") < ENV["MAX_SEARCHES_PER_USER"].to_i
-    send_sqs_message("initialize\n#{query}") unless REDIS.exists("searches:#{query}")
-    REDIS.sadd("users:#{user_id}:#{category}", query) if category
-    REDIS.sadd("users:#{user_id}", query)
-  end
-end
-
-# TODO: remove
-def process_refresh(tokens)
-  LOGGER.info tokens.join(" ")
-
-  user_id = tokens[1]
-  REDIS.sscan_each("users:#{user_id}") do |query|
-    if REDIS.exists("searches:#{query}")
-      REDIS.expire("searches:#{query}", ENV["CACHE_EXPIRY"].to_i)
-    else
-      send_sqs_message("initialize\n#{query}")
-    end
-  end
-end
-
-# TODO: remove
-def process_update(tokens)
-  LOGGER.info tokens.join(" ")
-
-  user_id = tokens[1]
-  old_category = tokens[2]
-  old_query = normalize_query(tokens[3])
-  new_category = tokens[4]
-  new_query = normalize_query(tokens[5])
-
-  if old_query
-    REDIS.srem("users:#{user_id}", old_query)
-    REDIS.sadd("users:#{user_id}", new_query)
-  end
-
-  if old_category
-    REDIS.srem("users:#{user_id}:#{old_category}", old_query || new_query)
-    REDIS.sadd("users:#{user_id}:#{new_category}", new_query)
-  end
-
-  send_sqs_message("initialize\n#{new_query}") unless REDIS.exists("searches:#{new_query}")
-end
-
 def process_initialize(tokens)
   LOGGER.info tokens.join(" ")
 
@@ -218,55 +124,6 @@ def process_initialize(tokens)
       end
     end
   end
-end
-
-# TODO: remove
-def process_global_clean(tokens)
-  LOGGER.info tokens.join(" ")
-
-  user_id = tokens[1]
-  query = tokens[2]
-
-  REDIS.zremrangebyrank "searches/user:#{user_id}", 0, -ENV["MAX_POSTS_PER_SEARCH"].to_i
-  REDIS.expire("searches/user:#{user_id}", 60 * 60)
-
-  if REDIS.exists("searches:#{query}")
-    REDIS.expire("searches:#{query}", ENV["CACHE_EXPIRY"].to_i)
-  else
-    send_sqs_message("initialize\n#{query}")
-  end
-end
-
-# TODO: remove
-def process_named_clean(tokens)
-  LOGGER.info tokens.join(" ")
-
-  user_id = tokens[1]
-  category = tokens[2]
-  query = tokens[3]
-
-  REDIS.zremrangebyrank "searches/user:#{user_id}", 0, -ENV["MAX_POSTS_PER_SEARCH"].to_i
-  REDIS.expire("searches/user:#{user_id}", 60 * 60)
-  REDIS.zremrangebyrank "searches/user:#{user_id}:#{category}", 0, -ENV["MAX_POSTS_PER_SEARCH"].to_i
-  REDIS.expire("searches/user:#{user_id}:#{category}", 60 * 60)
-
-  if REDIS.exists("searches:#{query}")
-    REDIS.expire("searches:#{query}", ENV["CACHE_EXPIRY"].to_i)
-  else
-    send_sqs_message("initialize\n#{query}")
-  end
-end
-
-# TODO: remove
-def process_rename(tokens)
-  LOGGER.info tokens.join(" ")
-
-  user_id = tokens[1]
-  old_category = tokens[2]
-  new_category = tokens[3]
-
-  REDIS.rename("users:#{user_id}:#{old_category}", "users:#{user_id}:#{new_category}") rescue Redis::CommandError
-  REDIS.rename("searches/user:#{user_id}:#{old_category}", "searches/user:#{user_id}:#{new_category}") rescue Redis::CommandError
 end
 
 process_queue(QUEUE)
