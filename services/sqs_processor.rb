@@ -10,7 +10,7 @@ require 'optparse'
 require "httparty"
 
 unless ENV["RUN"]
-  Process.daemon
+  Process.daemon(nil, true)
 end
 
 $running = true
