@@ -122,6 +122,8 @@ def process_initialize(tokens)
         REDIS.zremrangebyrank "searches:#{query}", 0, -ENV["MAX_POSTS_PER_SEARCH"].to_i
         REDIS.expire "searches:#{query}", ENV["CACHE_EXPIRY"].to_i
       end
+    else
+      LOGGER.error "  failed: received #{resp.code}\n  #{resp.body}"
     end
   end
 end

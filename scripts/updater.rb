@@ -41,6 +41,8 @@ REDIS.scan_each(match: "searches:*") do |key|
     if data.any?
       REDIS.zadd key, data
     end
+  else
+    LOGGER.error "  failed: received #{resp.code}\n  #{resp.body}"
   end
   sleep 1
 end
