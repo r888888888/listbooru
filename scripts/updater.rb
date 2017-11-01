@@ -23,7 +23,7 @@ LOGFILE = File.open($options[:logfile], "a")
 LOGFILE.sync = true
 LOGGER = Logger.new(LOGFILE, 0)
 
-REDIS.scan_each(match: "searches:*") do |key|
+def process_update(key, n = 1)
   key =~ /^searches:(.+)/
   query = $1
   LOGGER.info "updating #{query}"
@@ -43,6 +43,17 @@ REDIS.scan_each(match: "searches:*") do |key|
     end
   else
     LOGGER.error "  failed: received #{resp.code}\n  #{resp.body}"
+    if n >= 5
+      LOGGER.error "  giving up"
+    else
+      delay = (n ** 2) * 10
+      LOGGER.error "  retrying after #{delay}s"
+      sleep(delay)
+      process_update(key, n + 1)
+    end
   end
-  sleep 1
+end
+
+REDIS.scan_each(match: "searches:*") do |key|
+  process_update(key)
 end

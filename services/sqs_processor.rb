@@ -102,7 +102,7 @@ def normalize_query(query)
   tokens.join(" ")
 end
 
-def process_initialize(tokens)
+def process_initialize(tokens, n = 1)
   LOGGER.info tokens.join(" ")
 
   query = tokens[1]
@@ -124,6 +124,15 @@ def process_initialize(tokens)
       end
     else
       LOGGER.error "  failed: received #{resp.code}\n  #{resp.body}"
+
+      if n >= 5
+        LOGGER.error "  giving up"
+      else
+        delay = (n ** 2) * 10
+        LOGGER.error "  retrying after #{delay}s"
+        sleep(delay)
+        process_initialize(tokens, n + 1)
+      end
     end
   end
 end
